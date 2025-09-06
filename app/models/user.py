@@ -1,13 +1,10 @@
 from sqlalchemy import String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
+from app.db.base import Base
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class Users(Base):
-    __tablename__ = 'user'
+class User(Base):
+    __tablename__ = 'users'
 
     id: Mapped[int] = mapped_column(primary_key=True)
     first_name: Mapped[str] = mapped_column(String(30))
