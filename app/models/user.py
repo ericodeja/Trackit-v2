@@ -9,6 +9,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     first_name: Mapped[str] = mapped_column(String(30))
     last_name: Mapped[str] = mapped_column(String(30))
+    username: Mapped[str]
     email:Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
 
