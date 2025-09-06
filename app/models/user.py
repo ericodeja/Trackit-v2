@@ -12,6 +12,3 @@ class User(Base):
     email:Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
 
-    def __repr__(self) -> str:
-        return f'User(id{self.id!r}, first_name={self.first_name!r}, last_name={self.last_name!r})'
-
