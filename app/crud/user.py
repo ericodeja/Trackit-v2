@@ -5,8 +5,11 @@ from app.db.base import engine
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.core.security import hash_password, verify_password
-from fastapi import HTTPException, status
-from app.crud.token import create_access_token, create_refresh_token
+from fastapi import HTTPException, status, BackgroundTasks
+from app.crud.token import create_access_token, create_refresh_token, create_password_reset_token
+from app.utils.email import password_reset_email
+
+
 
 
 def create_new_user(form_data) -> UserBase:
@@ -51,3 +54,30 @@ def user_logout(user):
         if result is not None:
             session.delete(result)
             session.commit()
+
+
+def password_reset_request(data, background_tasks: BackgroundTasks):
+    with Session(engine) as session:
+        stmt = select(User).where(User.email == data.email)
+        current_user = session.execute(stmt).scalar_one_or_none()
+
+        if current_user is not None:
+            token = create_password_reset_token(current_user)
+            frontend_url = 'http://127.0.0.1:8000/auth/reset_password_route'
+            reset_link = f'{frontend_url}?token={token}'
+
+            return password_reset_email(background_tasks, current_user.email,reset_link)
+        
+def reset_password(user_id: int,new_password: str):
+    hashed_pw = hash_password(new_password)
+    with Session(engine) as session:
+        stmt = select(User).where(User.id == user_id)
+        current_user = session.execute(stmt).scalar_one_or_none()
+
+        if current_user is not None:
+            current_user.password = hashed_pw
+            
+        else:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+        
+        session.commit()

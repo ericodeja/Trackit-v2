@@ -1,4 +1,4 @@
-from jose import jwt  # type: ignore
+from jose import jwt 
 from datetime import datetime, timedelta, timezone
 from app.core.config import settings
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from app.db.base import engine
 
 
 def create_access_token(user):
-    encode = {'user_id': user.id}
+    encode = {'sub': user.id}
     expires = datetime.now(timezone.utc) + timedelta(minutes=15)
     encode['exp'] = int(expires.timestamp())
 
@@ -24,7 +24,7 @@ def create_access_token(user):
 
 
 def create_refresh_token(user):
-    encode = {'user_id': user.id}
+    encode = {'sub': user.id}
     expires = datetime.now(timezone.utc) + timedelta(days=7)
     encode['exp'] = int(expires.timestamp())
 
@@ -59,3 +59,19 @@ def create_refresh_token(user):
         session.add(new_token)
         session.commit()
     return refresh_token
+
+def create_password_reset_token(current_user):
+    encode = {'sub': str(current_user.id), 'scope': 'password_reset'}
+    expires = datetime.now(timezone.utc) + timedelta(minutes=3)
+    encode['exp'] = str(int(expires.timestamp()))
+
+    
+    if not settings.PASSWORD_RESET_KEY:
+        raise ValueError('Missing PASSWORD_RESET_KEY')
+    if not settings.ALGORITHM:
+        raise ValueError('Missing ALGORITHM')
+    
+    password_reset_token = jwt.encode(encode, settings.PASSWORD_RESET_KEY, algorithm=settings.ALGORITHM)
+
+    return password_reset_token
+
