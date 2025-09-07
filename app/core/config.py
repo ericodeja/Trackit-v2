@@ -9,7 +9,7 @@ class Settings():
     DATABASE_URL = os.getenv('DATABASE_URL')
     SECRET_ACCESS_KEY = os.getenv('SECRET_ACCESS_KEY')
     SECRET_REFRESH_KEY = os.getenv('SECRET_REFRESH_KEY')
-    PASSWORD_RESET_KEY = os.getenv('PASSWORD_RESET_KEY')
+    RESET_KEY = os.getenv('RESET_KEY')
     SMTP_USER = os.getenv("SMTP_USER")
     SMTP_PASS = os.getenv("SMTP_PASS")
 

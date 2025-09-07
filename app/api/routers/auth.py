@@ -1,7 +1,8 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
-from app.schemas.user import User, UserBase, UserLog, PasswordResetRequest, PasswordResetConfirm
-from app.crud.user import create_new_user, user_login, user_logout, password_reset_request, reset_password
-from app.core.security import verify_password_reset_token
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordRequestForm
+from app.schemas.user import User, UserBase, PasswordResetRequest, PasswordResetConfirm, EmailResetRequest, EmailResetConfirm
+from app.crud.user import create_new_user, user_login, user_logout, password_reset_request, reset_password, email_reset_request, reset_email
+from app.core.security import verify_password_reset_token, get_current_user, verify_email_reset_token
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 
@@ -12,12 +13,12 @@ def signup_route(form_data: User) -> UserBase:
 
 
 @router.post('/login')
-def login_route(form_data: UserLog):
+def login_route(form_data: OAuth2PasswordRequestForm = Depends()):
     return user_login(form_data)
 
 
 @router.post('/logout')
-def logout_route(user: UserBase):
+def logout_route(user: dict = Depends(get_current_user)):
     return user_logout(user)
 
 
@@ -27,15 +28,35 @@ def reset_password_request_route(data: PasswordResetRequest, background_tasks: B
     return {"message": f"If {data.email} exists, a reset link has been sent."}
 
 
-@router.patch("/reset-password")
+@router.patch('/reset-password')
 def reset_password_route(data: PasswordResetConfirm):
 
-    user_id =   verify_password_reset_token(data.token)
+    user_id = verify_password_reset_token(data.token)
 
     if user_id is None:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
-    
+
     # hash new password and update db
     reset_password(user_id, data.new_password)
 
     return {"message": "Password reset successful"}
+
+
+@router.post('/email-reset-request')
+def reset_email_request_route(data: EmailResetRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
+    email_reset_request(data, user, background_tasks)
+
+
+@router.patch('reset-email')
+def reset_email_route(data: EmailResetConfirm, background_tasks: BackgroundTasks):
+    reset_data = verify_email_reset_token(data.token)
+     
+    for item in  reset_data:
+        if item is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token')
+    
+    print(reset_data[0], reset_data[1])
+    
+    reset_email(reset_data[0], reset_data[1], background_tasks)
+
+    return {"message": "Email reset successful"}

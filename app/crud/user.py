@@ -1,15 +1,13 @@
 from app.models.user import User
-from app.models.token import Token
 from app.schemas.user import UserBase
 from app.db.base import engine
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from pydantic import EmailStr
 from app.core.security import hash_password, verify_password
 from fastapi import HTTPException, status, BackgroundTasks
-from app.crud.token import create_access_token, create_refresh_token, create_password_reset_token
-from app.utils.email import password_reset_email
-
-
+from app.crud.token import create_access_token, create_refresh_token,create_password_reset_token, delete_refresh_token, create_email_reset_token
+from app.utils.email import password_reset_email, email_reset_email, email_reset_confirmation
 
 
 def create_new_user(form_data) -> UserBase:
@@ -32,7 +30,7 @@ def create_new_user(form_data) -> UserBase:
 
 def user_login(form_data):
     with Session(engine) as session:
-        stmt = select(User).where(User.email == form_data.email)
+        stmt = select(User).where(User.email == form_data.username)
         current_user = session.execute(stmt).scalar_one_or_none()
 
         if current_user is not None:
@@ -41,19 +39,18 @@ def user_login(form_data):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid password')
 
-            return create_access_token(current_user), create_refresh_token(current_user)
+            return {
+                "access_token": create_access_token(current_user),
+                "refresh_token": create_refresh_token(current_user),
+                "token_type": "bearer"
+            }
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
 
 
 def user_logout(user):
-    with Session(engine) as session:
-        stmt = select(Token).where(Token.user_id == user.id)
-        result = session.execute(stmt).scalar_one_or_none()
-        if result is not None:
-            session.delete(result)
-            session.commit()
+    delete_refresh_token(user)
 
 
 def password_reset_request(data, background_tasks: BackgroundTasks):
@@ -66,9 +63,10 @@ def password_reset_request(data, background_tasks: BackgroundTasks):
             frontend_url = 'http://127.0.0.1:8000/auth/reset_password_route'
             reset_link = f'{frontend_url}?token={token}'
 
-            return password_reset_email(background_tasks, current_user.email,reset_link)
-        
-def reset_password(user_id: int,new_password: str):
+            return password_reset_email(background_tasks, current_user.email, reset_link)
+
+
+def reset_password(user_id: int, new_password: str):
     hashed_pw = hash_password(new_password)
     with Session(engine) as session:
         stmt = select(User).where(User.id == user_id)
@@ -76,8 +74,38 @@ def reset_password(user_id: int,new_password: str):
 
         if current_user is not None:
             current_user.password = hashed_pw
-            
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+
+        session.commit()
+
+def email_reset_request(data, user, background_tasks: BackgroundTasks):
+    with Session(engine) as session:
+        stmt = select(User.email).where(User.email == data.new_email)
+        result = session.execute(stmt).scalar()
+
+        if result is None:
+            email_reset_token = create_email_reset_token(user, data.new_email)
+
+            frontend_url = 'http://127.0.0.1:8000/auth/email_password_route'
+            reset_link = f'{frontend_url}?token={email_reset_token}'
+            print(email_reset_token)
+
+            return email_reset_email(background_tasks, data.new_email, reset_link)
+        
+
+def reset_email(user_id: int, new_email: EmailStr, background_tasks: BackgroundTasks):
+    with Session(engine) as session:
+        stmt = select(User).where(User.id == user_id)
+        current_user = session.execute(stmt).scalar_one_or_none()
+
+        if current_user is not None:
+            old_email = current_user.email
+            current_user.email = new_email
+            email_reset_confirmation(background_tasks, old_email)
+
         else:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-        
         session.commit()
