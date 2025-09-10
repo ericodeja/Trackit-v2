@@ -12,4 +12,4 @@ class User(Base):
     username: Mapped[str]
     email:Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
-
+    role: Mapped[str] = mapped_column(default='user')

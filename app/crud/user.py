@@ -1,5 +1,6 @@
 from app.models.user import User
 from app.schemas.user import UserBase
+from app.schemas.profile_changes import ProfileChanges
 from app.db.base import engine
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -7,6 +8,7 @@ from pydantic import EmailStr
 from app.core.security import hash_password, verify_password
 from fastapi import HTTPException, status, BackgroundTasks
 from app.crud.token import create_access_token, create_refresh_token,create_password_reset_token, delete_refresh_token, create_email_reset_token
+from app.crud.profile_changes import add_change
 from app.utils.email import password_reset_email, email_reset_email, email_reset_confirmation
 
 
@@ -78,6 +80,10 @@ def reset_password(user_id: int, new_password: str):
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+        
+        new_change = ProfileChanges(user_id=user_id, field_name='password reset', changed_by=user_id, old_value=None, new_value=None)
+
+        add_change(new_change)
 
         session.commit()
 
@@ -91,7 +97,6 @@ def email_reset_request(data, user, background_tasks: BackgroundTasks):
 
             frontend_url = 'http://127.0.0.1:8000/auth/email_password_route'
             reset_link = f'{frontend_url}?token={email_reset_token}'
-            print(email_reset_token)
 
             return email_reset_email(background_tasks, data.new_email, reset_link)
         
@@ -108,6 +113,10 @@ def reset_email(user_id: int, new_email: EmailStr, background_tasks: BackgroundT
 
         else:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+        
+        new_change = ProfileChanges(user_id=user_id, field_name='email reset', changed_by=user_id, old_value=None, new_value=new_email)
+
+        add_change(new_change)
         session.commit()
 
 def edit_name(data, user):
@@ -117,12 +126,25 @@ def edit_name(data, user):
         current_user = session.execute(stmt).scalar_one_or_none()
 
         if current_user is not None:
+            old_value= f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
+
             if data.first_name:
                 current_user.first_name = data.first_name
                 current_user.username = current_user.first_name
             if data.last_name:
                 current_user.last_name = data.last_name
+
+
+            new_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
+
+
+            new_change = ProfileChanges(user_id=user_id, field_name='name reset', changed_by=user_id, old_value=old_value, new_value=new_value)
+
+            add_change(new_change)
+
         else:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+        
+        
         
         session.commit()
