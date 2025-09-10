@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.profile_changes import ProfileChange
 from app.schemas.user import UserBase
 from app.schemas.profile_changes import ProfileChanges
 from app.db.base import engine
@@ -7,9 +8,10 @@ from sqlalchemy import select
 from pydantic import EmailStr
 from app.core.security import hash_password, verify_password
 from fastapi import HTTPException, status, BackgroundTasks
-from app.crud.token import create_access_token, create_refresh_token,create_password_reset_token, delete_refresh_token, create_email_reset_token
+from app.crud.token import create_access_token, create_refresh_token, create_password_reset_token, delete_refresh_token, create_email_reset_token
 from app.crud.profile_changes import add_change
 from app.utils.email import password_reset_email, email_reset_email, email_reset_confirmation
+from datetime import datetime, timedelta, timezone
 
 
 def create_new_user(form_data) -> UserBase:
@@ -80,12 +82,14 @@ def reset_password(user_id: int, new_password: str):
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-        
-        new_change = ProfileChanges(user_id=user_id, field_name='password reset', changed_by=user_id, old_value=None, new_value=None)
+
+        new_change = ProfileChanges(
+            user_id=user_id, field_name='password reset', changed_by=user_id, old_value=None, new_value=None)
 
         add_change(new_change)
 
         session.commit()
+
 
 def email_reset_request(data, user, background_tasks: BackgroundTasks):
     with Session(engine) as session:
@@ -99,7 +103,7 @@ def email_reset_request(data, user, background_tasks: BackgroundTasks):
             reset_link = f'{frontend_url}?token={email_reset_token}'
 
             return email_reset_email(background_tasks, data.new_email, reset_link)
-        
+
 
 def reset_email(user_id: int, new_email: EmailStr, background_tasks: BackgroundTasks):
     with Session(engine) as session:
@@ -112,21 +116,35 @@ def reset_email(user_id: int, new_email: EmailStr, background_tasks: BackgroundT
             email_reset_confirmation(background_tasks, old_email)
 
         else:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-        
-        new_change = ProfileChanges(user_id=user_id, field_name='email reset', changed_by=user_id, old_value=None, new_value=new_email)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+
+        new_change = ProfileChanges(user_id=user_id, field_name='email reset',
+                                    changed_by=user_id, old_value=None, new_value=new_email)
 
         add_change(new_change)
         session.commit()
 
+
 def edit_name(data, user):
     user_id = user.get('sub')
     with Session(engine) as session:
+
+        # Check if User is eligible
+        stmt = select(ProfileChange).where((ProfileChange.user_id == user_id) & (
+            ProfileChange.field_name == 'name reset')).order_by(ProfileChange.changed_at.desc()).limit(1)
+        result = session.execute(stmt).scalar_one_or_none()
+
+        if result:
+            if datetime.now(timezone.utc) < (result.changed_at + timedelta(days=30)):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                    detail='You can only change names every 30 days')
+
         stmt = select(User).where(User.id == user_id)
         current_user = session.execute(stmt).scalar_one_or_none()
 
         if current_user is not None:
-            old_value= f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
+            old_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
 
             if data.first_name:
                 current_user.first_name = data.first_name
@@ -134,17 +152,15 @@ def edit_name(data, user):
             if data.last_name:
                 current_user.last_name = data.last_name
 
-
             new_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
 
-
-            new_change = ProfileChanges(user_id=user_id, field_name='name reset', changed_by=user_id, old_value=old_value, new_value=new_value)
+            new_change = ProfileChanges(user_id=user_id, field_name='name reset',
+                                        changed_by=user_id, old_value=old_value, new_value=new_value)
 
             add_change(new_change)
 
         else:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-        
-        
-        
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+
         session.commit()

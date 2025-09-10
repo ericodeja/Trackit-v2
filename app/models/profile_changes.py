@@ -3,7 +3,7 @@ from app.db.base import Base
 from sqlalchemy import ForeignKey, String, DateTime, func
 from datetime import datetime
 
-class ProfileChanges(Base):
+class ProfileChange(Base):
     __tablename__ = 'profile_changes'
 
     id: Mapped[int] = mapped_column(primary_key=True)
