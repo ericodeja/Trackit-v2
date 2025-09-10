@@ -1,7 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.schemas.user import User, UserBase, PasswordResetRequest, PasswordResetConfirm, EmailResetRequest, EmailResetConfirm
-from app.crud.user import create_new_user, user_login, user_logout, password_reset_request, reset_password, email_reset_request, reset_email
+from app.schemas.user import User, UserBase, PasswordResetRequest, PasswordResetConfirm, EmailResetRequest, EmailResetConfirm, EditName
+from app.crud.user import create_new_user, user_login, user_logout, password_reset_request, reset_password, email_reset_request, reset_email, edit_name
 from app.core.security import verify_password_reset_token, get_current_user, verify_email_reset_token
 
 router = APIRouter(prefix='/auth', tags=['auth'])
@@ -21,7 +21,7 @@ def login_route(form_data: OAuth2PasswordRequestForm = Depends()):
 def logout_route(user: dict = Depends(get_current_user)):
     return user_logout(user)
 
-
+# PROFILE MANAGEMENT
 @router.post('/password-reset-request')
 def reset_password_request_route(data: PasswordResetRequest, background_tasks: BackgroundTasks):
     password_reset_request(data, background_tasks)
@@ -47,7 +47,7 @@ def reset_email_request_route(data: EmailResetRequest, background_tasks: Backgro
     email_reset_request(data, user, background_tasks)
 
 
-@router.patch('reset-email')
+@router.patch('/reset-email')
 def reset_email_route(data: EmailResetConfirm, background_tasks: BackgroundTasks):
     reset_data = verify_email_reset_token(data.token)
      
@@ -60,3 +60,7 @@ def reset_email_route(data: EmailResetConfirm, background_tasks: BackgroundTasks
     reset_email(reset_data[0], reset_data[1], background_tasks)
 
     return {"message": "Email reset successful"}
+
+@router.patch('/edit-name')
+def edit_name_route(data: EditName, user: dict = Depends(get_current_user)):
+    return edit_name(data, user)

@@ -109,3 +109,20 @@ def reset_email(user_id: int, new_email: EmailStr, background_tasks: BackgroundT
         else:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
         session.commit()
+
+def edit_name(data, user):
+    user_id = user.get('sub')
+    with Session(engine) as session:
+        stmt = select(User).where(User.id == user_id)
+        current_user = session.execute(stmt).scalar_one_or_none()
+
+        if current_user is not None:
+            if data.first_name:
+                current_user.first_name = data.first_name
+                current_user.username = current_user.first_name
+            if data.last_name:
+                current_user.last_name = data.last_name
+        else:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+        
+        session.commit()

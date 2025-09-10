@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 
 class User(BaseModel):
     first_name: str
@@ -26,3 +27,7 @@ class EmailResetRequest(BaseModel):
 
 class EmailResetConfirm(BaseModel):
     token: str
+
+class EditName(BaseModel):
+    first_name: Optional[str]
+    last_name: Optional[str]
