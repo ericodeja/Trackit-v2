@@ -10,3 +10,7 @@ app.include_router(auth.router)
 @app.get('/ping')
 def health_check():
     return {'status': 'ok'}
+
+
+
+
