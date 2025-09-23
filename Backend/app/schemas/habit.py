@@ -17,3 +17,14 @@ class Habit(BaseModel):
     start_date: datetime
     end_date: Optional[datetime]
     status: HabitStatus = HabitStatus.INCOMPLETE
+
+class HabitUpdate(BaseModel):
+    id: int
+    title: Optional[str]
+    description: Optional[str]
+    frequency: Optional[str]
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+
+class HabitDelete(BaseModel):
+    id: int
