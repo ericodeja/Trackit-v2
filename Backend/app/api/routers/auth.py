@@ -22,13 +22,13 @@ def logout_route(user: dict = Depends(get_current_user)):
     return user_logout(user)
 
 # PROFILE MANAGEMENT
-@router.post('/password-reset-request')
+@router.post('/password-reset/request')
 def reset_password_request_route(data: PasswordResetRequest, background_tasks: BackgroundTasks):
     password_reset_request(data, background_tasks)
     return {"message": f"If {data.email} exists, a reset link has been sent."}
 
 
-@router.patch('/reset-password')
+@router.post('/password-reset/confirm')
 def reset_password_route(data: PasswordResetConfirm):
 
     user_id = verify_password_reset_token(data.token)
@@ -42,12 +42,12 @@ def reset_password_route(data: PasswordResetConfirm):
     return {"message": "Password reset successful"}
 
 
-@router.post('/email-reset-request')
+@router.post('/email-reset/request')
 def reset_email_request_route(data: EmailResetRequest, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     email_reset_request(data, user, background_tasks)
 
 
-@router.patch('/reset-email')
+@router.post('/email-reset/confirm')
 def reset_email_route(data: EmailResetConfirm, background_tasks: BackgroundTasks):
     reset_data = verify_email_reset_token(data.token)
      

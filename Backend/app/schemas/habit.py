@@ -16,7 +16,7 @@ class Habit(BaseModel):
     is_completed: bool = False
 
 class HabitUpdate(BaseModel):
-    id: int
+    habit_id: int
     title: Optional[str]
     description: Optional[str]
     frequency: Optional[str]

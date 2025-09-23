@@ -1,8 +1,9 @@
 from app.db.base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, ForeignKey,  Enum
+from sqlalchemy import String, ForeignKey
 from datetime import datetime
 import app.models.user
+import app.models.habit_completion
 
 
 class Habit(Base):
@@ -21,3 +22,5 @@ class Habit(Base):
 
     user: Mapped['app.models.user.User'] = relationship(
         'User', back_populates='habit')
+    
+    completions: Mapped['app.models.habit_completion.HabitCompletion'] = relationship('HabitCompletion', back_populates='habit', cascade='all, delete-orphan',)

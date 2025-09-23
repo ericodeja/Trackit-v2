@@ -26,3 +26,5 @@ class User(Base):
     profile_change: Mapped['app.models.profile_changes.ProfileChange'] = relationship('ProfileChange',
                                                                                       back_populates='user',
                                                                                       foreign_keys=[app.models.profile_changes.ProfileChange.user_id], cascade='all, delete-orphan', passive_deletes=True)
+    
+

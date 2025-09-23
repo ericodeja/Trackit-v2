@@ -5,6 +5,8 @@ from app.db.base import engine
 from app.models.habit import Habit
 from app.utils.habit_frequency import can_complete_task
 from datetime import datetime, timedelta, timezone
+from app.crud.habit_completions import add_completion
+from app.schemas.habit_completions import HabitCompletions
 
 
 def create_habit(data, user):
@@ -39,7 +41,7 @@ def create_habit(data, user):
 
 def edit_habit(data):
     with Session(engine) as session:
-        stmt = select(Habit).where(Habit.id == data.id)
+        stmt = select(Habit).where(Habit.id == data.habit_id)
         current_habit = session.execute(stmt).scalar_one_or_none()
 
         if current_habit is not None:
@@ -59,6 +61,7 @@ def edit_habit(data):
         session.commit()
         return current_habit
 
+
 def delete_habit(data):
     with Session(engine) as session:
         stmt = select(Habit).where(Habit.id == data.id)
@@ -68,25 +71,34 @@ def delete_habit(data):
         if current_habit is not None:
             session.delete(current_habit)
             session.commit()
-        
+
         else:
             raise HTTPException(status_code=404)
-        
+
+
 def complete_habit(data):
     with Session(engine) as session:
         stmt = select(Habit).where(Habit.id == data.id)
         current_habit = session.execute(stmt).scalar_one_or_none()
 
         if current_habit is not None:
-            is_eligible = can_complete_task(current_habit.last_completed, current_habit.frequency)
+            is_eligible = can_complete_task(
+                current_habit.last_completed, current_habit.frequency)
 
             if is_eligible:
                 current_habit.is_completed = True
                 current_habit.last_completed = datetime.now(timezone.utc)
 
+                new_completion = HabitCompletions(
+                    habit_id=current_habit.id,
+                    completed_at=datetime.now(timezone.utc)
+                )
+                add_completion(new_completion)
+
                 session.commit()
             else:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Task is not eligible to be completed')
-        
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                    detail='Task is not eligible to be completed')
+
         else:
             raise HTTPException(status_code=404)
