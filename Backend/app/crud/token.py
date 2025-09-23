@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 def create_access_token(user):
     encode = {'sub': str(user.id)}
-    expires = datetime.now(timezone.utc) + timedelta(minutes=15)
+    expires = datetime.now(timezone.utc) + timedelta(hours=15)
     encode['exp'] = str(int(expires.timestamp()))
 
     if not settings.SECRET_ACCESS_KEY:

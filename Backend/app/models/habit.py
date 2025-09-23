@@ -3,7 +3,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, ForeignKey,  Enum
 from datetime import datetime
 import app.models.user
-from app.schemas.habit import HabitStatus
 
 
 class Habit(Base):
@@ -17,8 +16,7 @@ class Habit(Base):
     frequency: Mapped[str]
     start_date: Mapped[datetime]
     end_date: Mapped[datetime] = mapped_column(nullable=True)
-    status: Mapped[str] = mapped_column(
-        Enum(HabitStatus, name='habit_status'), server_default=HabitStatus.INCOMPLETE)
+    status: Mapped[str] = mapped_column(default='INCOMPLETE')
 
     user: Mapped['app.models.user.User'] = relationship(
         'User', back_populates='habit')
