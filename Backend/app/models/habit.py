@@ -16,7 +16,8 @@ class Habit(Base):
     frequency: Mapped[str]
     start_date: Mapped[datetime]
     end_date: Mapped[datetime] = mapped_column(nullable=True)
-    status: Mapped[str] = mapped_column(default='INCOMPLETE')
+    is_completed: Mapped[bool] = mapped_column(default=False)
+    last_completed: Mapped[datetime] = mapped_column(nullable=True)
 
     user: Mapped['app.models.user.User'] = relationship(
         'User', back_populates='habit')

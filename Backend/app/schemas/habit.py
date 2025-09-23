@@ -3,11 +3,8 @@ from datetime import datetime
 from typing import Optional
 import enum
 
-
-
-class HabitStatus(str, enum.Enum):
-    COMPLETED = 'COMPLETED'
-    INCOMPLETE = 'INCOMPLETE'
+class HabitBase(BaseModel):
+    id: int
 
 class Habit(BaseModel):
     user_id: int
@@ -16,7 +13,7 @@ class Habit(BaseModel):
     frequency: str
     start_date: datetime
     end_date: Optional[datetime]
-    status: HabitStatus = HabitStatus.INCOMPLETE
+    is_completed: bool = False
 
 class HabitUpdate(BaseModel):
     id: int
@@ -25,6 +22,3 @@ class HabitUpdate(BaseModel):
     frequency: Optional[str]
     start_date: Optional[datetime]
     end_date: Optional[datetime]
-
-class HabitDelete(BaseModel):
-    id: int
