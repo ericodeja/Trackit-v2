@@ -1,132 +1,42 @@
 from app.models.user import User
 from app.models.profile_changes import ProfileChange
-from app.schemas.user import UserBase
 from app.schemas.profile_changes import ProfileChanges
+from app.crud.profile_changes import add_change
+from app.schemas.user import UserBase
 from app.db.base import engine
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from pydantic import EmailStr
-from app.core.security import hash_password, verify_password
-from fastapi import HTTPException, status, BackgroundTasks
-from app.crud.token import create_access_token, create_refresh_token, create_password_reset_token, delete_refresh_token, create_email_reset_token
-from app.crud.profile_changes import add_change
-from app.utils.email import password_reset_email, email_reset_email, email_reset_confirmation
+from app.core.security import hash_password
+from fastapi import HTTPException, status
+
 from datetime import datetime, timedelta, timezone
+from app.db.db_connection import db_connection
 
 
-def create_new_user(form_data) -> UserBase:
+def create_new_user(form_data) -> dict:
     hashed_password = hash_password(form_data.password)
-    with Session(engine) as session:
 
-        new_user = User(
-            first_name=form_data.first_name,
-            last_name=form_data.last_name,
-            username=form_data.first_name,
-            email=form_data.email,
-            password=hashed_password
-        )
+    new_user = User(
+        first_name=form_data.first_name,
+        last_name=form_data.last_name,
+        username=form_data.first_name,
+        email=form_data.email,
+        password=hashed_password
+    )
 
-        session.add(new_user)
-        session.commit()
+    db_connection.add(new_user)
 
-        return UserBase(id=new_user.id, username=new_user.username)
+    return {'sub': new_user.id, 'username': new_user.username}
 
 
-def user_login(form_data):
-    with Session(engine) as session:
-        stmt = select(User).where(User.email == form_data.username)
-        current_user = session.execute(stmt).scalar_one_or_none()
+def get_profile(user):
 
-        if current_user is not None:
-            # Verify if password is correct
-            if not verify_password(form_data.password, current_user.password):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid password')
+    current_user = db_connection.get_one(User, User.id, user.get('sub'))
 
-            return {
-                "access_token": create_access_token(current_user),
-                "refresh_token": create_refresh_token(current_user),
-                "token_type": "bearer"
-            }
-
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+    return UserBase(id=current_user.id, first_name=current_user.first_name, last_name=current_user.last_name, email=current_user.email, username=current_user.username)
 
 
-def user_logout(user):
-    delete_refresh_token(user)
-
-
-def password_reset_request(data, background_tasks: BackgroundTasks):
-    with Session(engine) as session:
-        stmt = select(User).where(User.email == data.email)
-        current_user = session.execute(stmt).scalar_one_or_none()
-
-        if current_user is not None:
-            token = create_password_reset_token(current_user)
-            frontend_url = 'http://127.0.0.1:8000/auth/reset_password_route'
-            reset_link = f'{frontend_url}?token={token}'
-
-            return password_reset_email(background_tasks, current_user.email, reset_link)
-
-
-def reset_password(user_id: int, new_password: str):
-    hashed_pw = hash_password(new_password)
-    with Session(engine) as session:
-        stmt = select(User).where(User.id == user_id)
-        current_user = session.execute(stmt).scalar_one_or_none()
-
-        if current_user is not None:
-            current_user.password = hashed_pw
-
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-
-        new_change = ProfileChanges(
-            user_id=user_id, field_name='password reset', changed_by=user_id, old_value=None, new_value=None)
-
-        add_change(new_change)
-
-        session.commit()
-
-
-def email_reset_request(data, user, background_tasks: BackgroundTasks):
-    with Session(engine) as session:
-        stmt = select(User.email).where(User.email == data.new_email)
-        result = session.execute(stmt).scalar()
-
-        if result is None:
-            email_reset_token = create_email_reset_token(user, data.new_email)
-
-            frontend_url = 'http://127.0.0.1:8000/auth/email_password_route'
-            reset_link = f'{frontend_url}?token={email_reset_token}'
-
-            return email_reset_email(background_tasks, data.new_email, reset_link)
-
-
-def reset_email(user_id: int, new_email: EmailStr, background_tasks: BackgroundTasks):
-    with Session(engine) as session:
-        stmt = select(User).where(User.id == user_id)
-        current_user = session.execute(stmt).scalar_one_or_none()
-
-        if current_user is not None:
-            old_email = current_user.email
-            current_user.email = new_email
-            email_reset_confirmation(background_tasks, old_email)
-
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-
-        new_change = ProfileChanges(user_id=user_id, field_name='email reset',
-                                    changed_by=user_id, old_value=None, new_value=new_email)
-
-        add_change(new_change)
-        session.commit()
-
-
-def edit_name(data, user):
+def edit_user(data, user):
     user_id = user.get('sub')
     with Session(engine) as session:
 
@@ -140,27 +50,26 @@ def edit_name(data, user):
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                     detail='You can only change names every 30 days')
 
-        stmt = select(User).where(User.id == user_id)
-        current_user = session.execute(stmt).scalar_one_or_none()
+        current_user = db_connection.get_one(User, User.id, user_id)
 
-        if current_user is not None:
-            old_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
+        old_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
 
-            if data.first_name:
-                current_user.first_name = data.first_name
-                current_user.username = current_user.first_name
-            if data.last_name:
-                current_user.last_name = data.last_name
+        if data.first_name:
+            current_user.first_name = data.first_name
+            current_user.username = current_user.first_name
+        if data.last_name:
+            current_user.last_name = data.last_name
 
-            new_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
+        new_value = f'first_name={current_user.first_name}, last_name={current_user.last_name}, username={current_user.username}'
 
-            new_change = ProfileChanges(user_id=user_id, field_name='name reset',
-                                        changed_by=user_id, old_value=old_value, new_value=new_value)
+        new_change = ProfileChanges(user_id=user_id, field_name='name reset',
+                                   changed_by=user_id, old_value=old_value, new_value=new_value)
 
-            add_change(new_change)
-
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+        add_change(new_change)
 
         session.commit()
+
+
+def delete_user(user):
+    current_user = db_connection.get_one(User, User.id, user.get('sub'))
+    db_connection.delete(current_user)

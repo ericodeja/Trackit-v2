@@ -1,9 +1,7 @@
-from sqlalchemy.orm import Session
-from app.db.base import engine
 from app.models.profile_changes import ProfileChange
+from app.db.db_connection import db_connection
 
 def add_change(data):
-    with Session(engine) as session:
         new_change = ProfileChange(
             user_id = data.user_id,
             field_name = data.field_name,
@@ -12,5 +10,4 @@ def add_change(data):
             changed_by = data.changed_by
         )
 
-        session.add(new_change)
-        session.commit()
+        db_connection.add(new_change)
